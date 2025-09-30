@@ -46,14 +46,15 @@ jobs:
         run: |
           curl -L -r 0-1023 -o sample.part "${{ inputs.ipa_url }}" > /dev/null 2>&1
           file_type=$(file --mime-type -b sample.part)
-
           if [[ "$file_type" != "application/x-ios-app" && "$file_type" != "application/zip" ]]; then
             echo "::error::Validation failed: The file is not a valid IPA file. Detected type: $file_type."
             exit 1
           fi
 
       - name: Install Dependencies
-        run: brew install make ldid
+        run: |
+          brew install make ldid
+          pipx install --force git+https://github.com/asdfzxcvbn/pyzule-rw.git
 
       - name: Set PATH environment variable
         run: echo "$(brew --prefix make)/libexec/gnubin" >> $GITHUB_PATH
@@ -61,12 +62,9 @@ jobs:
       - name: Cache Theos
         id: theos
         uses: actions/cache@v4.2.3
-        env:
-          cache-name: theos_cache_67db2ab
         with:
           path: theos/
-          key: ${{ env.cache-name }}
-          restore-keys: ${{ env.cache-name }}
+          key: theos_cache_67db2ab
 
       - name: Setup Theos
         if: steps.theos.outputs.cache-hit != 'true'
@@ -88,21 +86,15 @@ jobs:
         env:
           THEOS: ${{ github.workspace }}/theos
 
-      - name: Install cyan
-        run: pipx install --force https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
-
       - name: Download YouTube Music
-        id: download_youtube_music
         run: wget "${{ inputs.ipa_url }}" --no-verbose -O ${{ github.workspace }}/main/ytm.ipa
 
       - name: Build Tweak for Sideloading
-  id: build_package
-  run: cd ${{ github.workspace }}/main
-       make clean package SIDELOADING=1
-  env:
-    THEOS: ${{ github.workspace }}/theos
-    CFLAGS: -Wno-error=vla-cxx-extension
-
+        run: |
+          cd ${{ github.workspace }}/main
+          make clean package SIDELOADING=1
+        env:
+          THEOS: ${{ github.workspace }}/theos
 
       - name: Inject tweak into provided IPA
         run: |
